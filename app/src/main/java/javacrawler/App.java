@@ -22,12 +22,23 @@ import org.jsoup.select.Elements;
 public class App {
     public static void main(String[] args) throws IOException, URISyntaxException{
         //Checkign if there are enough arguments
-        // if(args.length != 2){
-        //     System.out.printf("Usage:\nWindows: ./gradlew.bat run --quiet --args=\"url depth\"\nLinux: ./gradlew run --quiet --args=\"url depth\"\n");
-        //     return;
-        // } 
-
-        Set<String> emails = crawlWrapper("https://en.wikipedia.org/wiki/Email_address", 1);
+        if(args.length != 2){
+            System.out.printf("Usage: ./app url level\n");
+            return;
+        } 
+        String url = args[0];
+        Integer level;
+        try {
+            level = Integer.parseInt(args[1]);
+            if(level <= 0){
+                System.out.println("The second argument should be a valid positive integer.");
+                return;
+            }
+        } catch(NumberFormatException e){
+            System.out.println("The second argument should be a valid positive integer");
+            return;
+        }
+        Set<String> emails = crawlWrapper(url, level);
         for(String email : emails){
             System.out.println(email);
         }
@@ -84,7 +95,7 @@ public class App {
 
     private static Set<String> crawl(String url, int level, int maxLevel, Set<String> visited, Set<String> extractedEmails) throws URISyntaxException, IOException{
         if(level < maxLevel){
-            System.out.printf("\rCrawling %s",url);
+            System.out.printf("\nCrawling %s\n",url);
             Set<String> emails = extractEmailsFromUrl(url);
             for(String email : emails){
                 if(!extractedEmails.contains(email)){

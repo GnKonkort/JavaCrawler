@@ -8,15 +8,10 @@ package javacrawler;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import javax.naming.spi.DirStateFactory.Result;
 
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -31,21 +26,26 @@ public class App {
         //     System.out.printf("Usage:\nWindows: ./gradlew.bat run --quiet --args=\"url depth\"\nLinux: ./gradlew run --quiet --args=\"url depth\"\n");
         //     return;
         // } 
-        Set<String> emails = extractEmailsFromUrl("https://en.wikipedia.org/wiki/Email_address");
+
+        Set<String> emails = crawlWrapper("https://en.wikipedia.org/wiki/Email_address", 1);
         for(String email : emails){
             System.out.println(email);
         }
     }
     private static Set<String> extractEmailsFromUrl(String url) throws URISyntaxException, IOException{
         Set<String> result = new HashSet<String>();
-        Connection con = Jsoup.connect(url);
-        Document doc = con.get();
-        Matcher m = Pattern.compile("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+").matcher(doc.text());
-        while(m.find()) {
-            result.add(m.group());
+        try {
+            Connection con = Jsoup.connect(url);
+            Document doc = con.get();
+            Matcher m = Pattern.compile("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+").matcher(doc.text());
+            while(m.find()) {
+                result.add(m.group());
+            }
+            return result;
         }
-
-        return result;
+        catch (IOException e) {
+            return result;
+        }
     }
     /*
     This function extracts domain from the URL passed to it.
@@ -63,17 +63,48 @@ public class App {
     */
     private static Set<String> getExternalURLs(String url) throws IOException, URISyntaxException{
         Set<String> result = new HashSet<String>();
-        Connection con = Jsoup.connect(url);
-        String currentDomain = getDomainName(url);
-        Document doc = con.get();
+        try {
+            Connection con = Jsoup.connect(url);
+            String currentDomain = getDomainName(url);
+            Document doc = con.get();
 
-        Elements links = doc.select("a[href]");
-        for(Element link : links){
-            if(!currentDomain.equals(getDomainName(link.attr("abs:href")))){
-                result.add(link.attr("abs:href"));
+            Elements links = doc.select("a[href]");
+            for(Element link : links){
+                if(link.attr("abs:href").startsWith("http") && !currentDomain.equals(getDomainName(link.attr("abs:href")))){
+                    result.add(link.attr("abs:href"));
+                }
+                // result.add(link.attr("abs:href"));
             }
-            // result.add(link.attr("abs:href"));
+            return result;
         }
-        return result;
+        catch (IOException e){
+            return result;
+        }
+    }
+
+    private static Set<String> crawl(String url, int level, int maxLevel, Set<String> visited, Set<String> extractedEmails) throws URISyntaxException, IOException{
+        if(level < maxLevel){
+            System.out.printf("\rCrawling %s",url);
+            Set<String> emails = extractEmailsFromUrl(url);
+            for(String email : emails){
+                if(!extractedEmails.contains(email)){
+                    System.out.println(email);
+                    extractedEmails.add(email);
+                }
+            }
+            Set<String> externalLinks = getExternalURLs(url);
+            for(String link : externalLinks){
+                if(!visited.contains(link)){
+                    crawl(link, level++, maxLevel, visited, emails);
+                    visited.add(url);
+                }
+            }
+        }
+        return extractedEmails;
+    }
+    public static Set<String> crawlWrapper(String url, int maxLevel) throws URISyntaxException, IOException{
+        Set<String> visitedEmails = new HashSet<String>();
+        Set<String> visitedUrls = new HashSet<String>();
+        return crawl(url, 0, maxLevel, visitedUrls, visitedEmails);
     }
 }
